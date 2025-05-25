@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SD3 - SDG Companies Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f6faf7;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .sticky-company-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            z-index: 1000;
+            background: #1b5e20;
+            color: #fff;
+            font-size: 1.3rem;
+            font-weight: 600;
+            padding: 12px 0 12px 40px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: none;
+            transition: background 0.3s;
+            letter-spacing: 0.5px;
+        }
+        .sticky-company-bar.visible {
+            display: block;
+        }
+        .dashboard-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(34, 139, 34, 0.08);
+            padding-top: 60px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: linear-gradient(135deg, #1b5e20, #388e3c);
+            color: white;
+            border-radius: 15px;
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.95;
+            color: #e8f5e9;
+        }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 1.2rem;
+        }
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: #f6faf7;
+            color: #1b5e20;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(34, 139, 34, 0.07);
+            border: 1.5px solid #e0f2f1;
+        }
+        .stat-card.highlight {
+            border: 2.5px solid #43a047;
+            background: #e8f5e9;
+            color: #1b5e20;
+        }
+        .stat-card .stat-label {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #388e3c;
+            margin-bottom: 4px;
+        }
+        .stat-card .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #1b5e20;
+        }
+        .controls-section {
+            background: #f6faf7;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(34, 139, 34, 0.06);
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            align-items: end;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #388e3c;
+        }
+        .form-group select, .form-group input {
+            padding: 12px;
+            border: 2px solid #c8e6c9;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: #fff;
+            color: #1b5e20;
+            transition: border-color 0.3s;
+        }
+        .form-group select:focus, .form-group input:focus {
+            outline: none;
+            border-color: #43a047;
+        }
+        .btn {
+            background: linear-gradient(90deg, #43a047 60%, #81c784 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 2px 8px rgba(34, 139, 34, 0.08);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(90deg, #388e3c 60%, #66bb6a 100%);
+        }
+        .company-details {
+            background: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(34, 139, 34, 0.08);
+        }
+        .company-header {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0f2f1;
+        }
+        .company-info h2 {
+            color: #1b5e20;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .company-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .meta-item {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #43a047;
+        }
+        .meta-item strong {
+            color: #1b5e20;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .sdg-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .metric-card {
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            color: white;
+        }
+        .sbti-card { background: linear-gradient(135deg, #388e3c, #66bb6a); }
+        .scope-card { background: linear-gradient(135deg, #43a047, #a5d6a7); }
+        .revenue-card { background: linear-gradient(135deg, #2e7d32, #b9f6ca); color: #1b5e20; }
+        .employees-card { background: linear-gradient(135deg, #00897b, #b2dfdb); color: #004d40; }
+        .metric-card h3 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+        .metric-card p {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        .charts-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .chart-container {
+            background: #f6faf7;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(34, 139, 34, 0.06);
+        }
+        .chart-container h3 {
+            color: #1b5e20;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .data-table {
+            background: #f6faf7;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(34, 139, 34, 0.06);
+        }
+        .table-header {
+            background: #388e3c;
+            color: white;
+            padding: 20px;
+        }
+        .table-header h3 {
+            margin-bottom: 10px;
+        }
+        .table-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .search-box {
+            padding: 8px 12px;
+            border: 1px solid #c8e6c9;
+            border-radius: 6px;
+            background: #e8f5e9;
+            color: #1b5e20;
+        }
+        .table-content {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .records-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .records-table th,
+        .records-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #c8e6c9;
+        }
+        .records-table th {
+            background: #e8f5e9;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            color: #1b5e20;
+        }
+        .records-table tr:hover {
+            background: #e0f2f1;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+        .export-section {
+            text-align: center;
+            margin-top: 30px;
+        }
+        @media (max-width: 768px) {
+            .charts-section {
+                grid-template-columns: 1fr;
+            }
+            .controls-grid {
+                grid-template-columns: 1fr;
+            }
+            .company-header {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sticky-company-bar" id="stickyCompanyBar"></div>
+    <div class="dashboard-container">
+        <div class="header">
+            <h1>🌱 SDG Companies Dashboard</h1>
+            <p>Comprehensive SDG and Sustainability Data - 2000 Companies</p>
+        </div>
+        
+        <div id="loadingSection" class="loading-spinner">
+            <div>
+                <div style="font-size: 2rem; margin-bottom: 10px;">🔄</div>
+                <div>Loading SDG company data...</div>
+            </div>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="stats-overview">
+                <div class="stat-card highlight">
+                    <div class="stat-label">Total Companies</div>
+                    <div class="stat-value" id="totalCompanies">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Regions</div>
+                    <div class="stat-value" id="uniqueRegions">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Industries</div>
+                    <div class="stat-value" id="uniqueIndustries">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">SBTi Committed</div>
+                    <div class="stat-value" id="sbtiCommitted">-</div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <div class="controls-grid">
+                    <div class="form-group">
+                        <label for="companySelect">Select Company:</label>
+                        <select id="companySelect">
+                            <option value="">Choose a company...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="regionFilter">Filter by Region:</label>
+                        <select id="regionFilter">
+                            <option value="">All Regions</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="industryFilter">Filter by Industry:</label>
+                        <select id="industryFilter">
+                            <option value="">All Industries</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sbtiFilter">SBTi Status:</label>
+                        <select id="sbtiFilter">
+                            <option value="">All</option>
+                            <option value="Targets Set">Targets Set</option>
+                            <option value="Committed">Committed</option>
+                            <option value="Near term targets approved">Near term approved</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchInput">Search Companies:</label>
+                        <input type="text" id="searchInput" placeholder="Type company name...">
+                    </div>
+                    <div class="form-group">
+                        <label>&nbsp;</label>
+                        <button class="btn" onclick="clearFilters()">Clear Filters</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="companyDetailsSection" class="company-details" style="display: none;">
+                <div class="company-header">
+                    <div class="company-info">
+                        <h2 id="companyName">-</h2>
+                        <p id="companyDescription">Select a company to view detailed SDG and sustainability data</p>
+                    </div>
+                    <button class="btn" onclick="exportCompanyData()">Export Data</button>
+                </div>
+
+                <div class="company-meta" id="companyMeta">
+                    <!-- Company metadata will be populated here -->
+                </div>
+
+                <div class="sdg-metrics">
+                    <div class="metric-card sbti-card">
+                        <h3 id="sbtiStatus">-</h3>
+                        <p>SBTi Status</p>
+                        <small>Science Based Targets</small>
+                    </div>
+                    <div class="metric-card scope-card">
+                        <h3 id="scopeEmissions">-</h3>
+                        <p>Scope 1+2 Emissions</p>
+                        <small>Million tCO2e (2023)</small>
+                    </div>
+                    <div class="metric-card revenue-card">
+                        <h3 id="revenue2023">-</h3>
+                        <p>Revenue 2023</p>
+                        <small>USD Million</small>
+                    </div>
+                    <div class="metric-card employees-card">
+                        <h3 id="employees2023">-</h3>
+                        <p>Employees 2023</p>
+                        <small>Total workforce</small>
+                    </div>
+                </div>
+
+                <div class="charts-section">
+                    <div class="chart-container">
+                        <h3>Revenue Trend (2021-2023)</h3>
+                        <canvas id="revenueTrendChart" width="400" height="300"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h3>Emissions Overview</h3>
+                        <canvas id="emissionsChart" width="400" height="300"></canvas>
+                    </div>
+                </div>
+
+                <div class="data-table">
+                    <div class="table-header">
+                        <h3>Company Details</h3>
+                        <div class="table-controls">
+                            <input type="text" class="search-box" id="recordSearch" placeholder="Search details...">
+                            <span id="recordCount">Company data</span>
+                        </div>
+                    </div>
+                    <div class="table-content">
+                        <table class="records-table">
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>2021</th>
+                                    <th>2022</th>
+                                    <th>2023</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="metricsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let companiesData = [];
+        let filteredCompanies = [];
+        let currentCompany = null;
+
+        // Load and parse CSV data
+        async function loadData() {
+            try {
+                // Simple: load from same directory as dashboard
+                const response = await fetch('SDG-2000data.csv');
+                if (!response.ok) throw new Error('CSV file not found in dashboard directory');
+                const csvData = await response.text();
+
+                // Show first lines for debugging
+                console.log('First 300 chars of CSV:', csvData.slice(0, 300));
+
+                // Parse CSV with robust header normalization
+                const parsed = Papa.parse(csvData, {
+                    header: true,
+                    skipEmptyLines: true,
+                    transformHeader: (header) => header.replace(/^\uFEFF/, '').trim().replace(/"/g, '').toLowerCase().replace(/ /g, '_'),
+                    error: (err) => { throw new Error('CSV parse error: ' + err.message); }
+                });
+                if (!parsed.data || parsed.data.length === 0) throw new Error('CSV parsed but no data rows found');
+                companiesData = parsed.data;
+                console.log(`Loaded ${companiesData.length} companies`);
+                // Initialize dashboard
+                initializeDashboard();
+                // Hide loading, show content
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading data:', error);
+                // Try to show first lines of CSV for debugging
+                let csvPreview = '';
+                try {
+                    const resp = await fetch('SDG-2000data.csv');
+                    if (resp.ok) {
+                        const txt = await resp.text();
+                        csvPreview = '<pre style="max-height:120px;overflow:auto;font-size:0.9em;background:#f6faf7;border:1px solid #eee;padding:8px;">' + txt.slice(0, 500).replace(/</g,'&lt;') + '</pre>';
+                    }
+                } catch {}
+                document.getElementById('loadingSection').innerHTML = `
+                    <div style="color: #e74c3c;">
+                        <div style="font-size: 2rem; margin-bottom: 10px;">❌</div>
+                        <div>Error loading data: ${error.message}</div>
+                        <div style="margin-top: 10px; font-size: 0.9rem;">
+                            Make sure <b>SDG-2000data.csv</b> is in the same folder as this dashboard file.<br>
+                            If you just moved the file, refresh the page.<br>
+                            <b>CSV preview:</b> ${csvPreview}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function initializeDashboard() {
+            updateOverviewStats();
+            populateCompanySelect();
+            populateRegionFilter();
+            populateIndustryFilter();
+            setupEventListeners();
+        }
+
+        function updateOverviewStats() {
+            const totalCompanies = companiesData.length;
+            const regions = [...new Set(companiesData.map(c => c.region).filter(r => r && r !== ''))];
+            const industries = [...new Set(companiesData.map(c => c.wba_industry).filter(i => i && i !== ''))];
+            const sbtiCommitted = companiesData.filter(c => c.sbti_2024 && c.sbti_2024.includes('Targets Set')).length;
+            
+            document.getElementById('totalCompanies').textContent = totalCompanies.toLocaleString();
+            document.getElementById('uniqueRegions').textContent = regions.length;
+            document.getElementById('uniqueIndustries').textContent = industries.length;
+            document.getElementById('sbtiCommitted').textContent = sbtiCommitted;
+        }
+
+        function populateCompanySelect() {
+            const select = document.getElementById('companySelect');
+            const companies = companiesData.map(c => c.company).filter(c => c).sort();
+            
+            select.innerHTML = '<option value="">Choose a company...</option>';
+            companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company;
+                option.textContent = company;
+                select.appendChild(option);
+            });
+        }
+
+        function populateRegionFilter() {
+            const select = document.getElementById('regionFilter');
+            const regions = [...new Set(companiesData.map(c => c.region).filter(r => r && r !== ''))].sort();
+            
+            regions.forEach(region => {
+                const option = document.createElement('option');
+                option.value = region;
+                option.textContent = region;
+                select.appendChild(option);
+            });
+        }
+
+        function populateIndustryFilter() {
+            const select = document.getElementById('industryFilter');
+            const industries = [...new Set(companiesData.map(c => c.wba_industry).filter(i => i && i !== ''))].sort();
+            
+            industries.forEach(industry => {
+                const option = document.createElement('option');
+                option.value = industry;
+                option.textContent = industry;
+                select.appendChild(option);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('companySelect').addEventListener('change', function() {
+                if (this.value) {
+                    selectCompany(this.value);
+                }
+            });
+            document.getElementById('regionFilter').addEventListener('change', filterCompanies);
+            document.getElementById('industryFilter').addEventListener('change', filterCompanies);
+            document.getElementById('sbtiFilter').addEventListener('change', filterCompanies);
+            document.getElementById('searchInput').addEventListener('input', filterCompanies);
+            document.getElementById('recordSearch').addEventListener('input', filterDetails);
+        }
+
+        function filterCompanies() {
+            const regionFilter = document.getElementById('regionFilter').value;
+            const industryFilter = document.getElementById('industryFilter').value;
+            const sbtiFilter = document.getElementById('sbtiFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            filteredCompanies = companiesData.filter(company => {
+                // Apply region filter
+                if (regionFilter && company.region !== regionFilter) return false;
+                
+                // Apply industry filter
+                if (industryFilter && company.wba_industry !== industryFilter) return false;
+                
+                // Apply SBTi filter
+                if (sbtiFilter && (!company.sbti_2024 || !company.sbti_2024.includes(sbtiFilter))) return false;
+                
+                // Apply search filter
+                if (searchTerm && (!company.company || !company.company.toLowerCase().includes(searchTerm))) return false;
+                
+                return true;
+            });
+            
+            // Update company select
+            const select = document.getElementById('companySelect');
+            const currentValue = select.value;
+            
+            select.innerHTML = '<option value="">Choose a company...</option>';
+            
+            const filteredNames = filteredCompanies.map(c => c.company).filter(c => c).sort();
+            filteredNames.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company;
+                option.textContent = company;
+                select.appendChild(option);
+            });
+            
+            // Restore selection if still valid
+            if (filteredNames.includes(currentValue)) {
+                select.value = currentValue;
+            } else {
+                select.value = '';
+                document.getElementById('companyDetailsSection').style.display = 'none';
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('regionFilter').value = '';
+            document.getElementById('industryFilter').value = '';
+            document.getElementById('sbtiFilter').value = '';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('recordSearch').value = '';
+            
+            filteredCompanies = [];
+            populateCompanySelect();
+        }
+
+        function selectCompany(companyName) {
+            const company = companiesData.find(c => c.company === companyName);
+            if (!company) {
+                console.error('Company not found:', companyName);
+                return;
+            }
+            
+            currentCompany = company;
+            
+            // Update company header
+            document.getElementById('companyName').textContent = company.company || 'N/A';
+            document.getElementById('companyDescription').textContent = 
+                `${company.wba_industry || 'N/A'} • ${company.headquarters || 'N/A'} • ${company.region || 'N/A'}`;
+            
+            // Update company metadata
+            updateCompanyMeta(company);
+            
+            // Update SDG metrics
+            updateSDGMetrics(company);
+            
+            // Update charts
+            updateCharts(company);
+            
+            // Update details table
+            updateDetailsTable(company);
+            
+            // Show details section
+            document.getElementById('companyDetailsSection').style.display = 'block';
+        }
+
+        function updateCompanyMeta(company) {
+            const metaContainer = document.getElementById('companyMeta');
+            
+            const metadata = [
+                { label: 'Website', value: company.website || 'N/A' },
+                { label: 'Headquarters', value: company.headquarters || 'N/A' },
+                { label: 'Region', value: company.region || 'N/A' },
+                { label: 'Income Group', value: company.income_group || 'N/A' },
+                { label: 'Ownership', value: company.ownership || 'N/A' },
+                { label: 'ISIN', value: company.isin || 'N/A' },
+                { label: 'Ticker', value: company.ticker || 'N/A' },
+                { label: 'Industry', value: company.wba_industry || 'N/A' }
+            ];
+            
+            metaContainer.innerHTML = metadata.map(item => 
+                `<div class="meta-item"><strong>${item.label}</strong>${item.value}</div>`
+            ).join('');
+        }
+
+        function updateSDGMetrics(company) {
+            const formatNumber = (num) => {
+                if (!num || num === '' || isNaN(parseFloat(num))) return 'N/A';
+                const n = parseFloat(num);
+                if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+                if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+                if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+                return n.toFixed(0);
+            };
+
+            document.getElementById('sbtiStatus').textContent = company.sbti_2024 || 'N/A';
+            document.getElementById('scopeEmissions').textContent = formatNumber(company['scope_1+2_milion_tco2e_lb_2023']);
+            document.getElementById('revenue2023').textContent = formatNumber(company['revenue_us$_m_2023']);
+            document.getElementById('employees2023').textContent = formatNumber(company['employees_2023']);
+        }
+
+        function updateCharts(company) {
+            updateRevenueTrendChart(company);
+            updateEmissionsChart(company);
+        }
+
+        function updateRevenueTrendChart(company) {
+            const ctx = document.getElementById('revenueTrendChart').getContext('2d');
+            
+            if (window.revenueTrendChart instanceof Chart) {
+                window.revenueTrendChart.destroy();
+            }
+            
+            const revenues = [
+                parseFloat(company['revenue_us$_m_2021']) || 0,
+                parseFloat(company['revenue_us$_m_2022']) || 0,
+                parseFloat(company['revenue_us$_m_2023']) || 0
+            ];
+            
+            window.revenueTrendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['2021', '2022', '2023'],
+                    datasets: [{
+                        label: 'Revenue (USD Million)',
+                        data: revenues,
+                        borderColor: '#43a047',
+                        backgroundColor: 'rgba(67, 160, 71, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Revenue (USD Million)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateEmissionsChart(company) {
+            const ctx = document.getElementById('emissionsChart').getContext('2d');
+            
+            if (window.emissionsChart instanceof Chart) {
+                window.emissionsChart.destroy();
+            }
+            
+            const scope12_2023 = parseFloat(company['scope_1+2_milion_tco2e_lb_2023']) || 0;
+            const scope3_2023 = parseFloat(company['scope_3_million_tco2e_2023']) || 0;
+            
+            window.emissionsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Scope 1+2', 'Scope 3'],
+                    datasets: [{
+                        data: [scope12_2023, scope3_2023],
+                        backgroundColor: ['#388e3c', '#66bb6a'],
+                        borderColor: ['#2e7d32', '#4caf50'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDetailsTable(company) {
+            const tbody = document.getElementById('metricsTableBody');
+            
+            const metrics = [
+                {
+                    metric: 'Revenue (USD Million)',
+                    y2021: company['revenue_us$_m_2021'] || 'N/A',
+                    y2022: company['revenue_us$_m_2022'] || 'N/A',
+                    y2023: company['revenue_us$_m_2023'] || 'N/A',
+                    unit: 'USD M'
+                },
+                {
+                    metric: 'Employees',
+                    y2021: company['employees_2021'] || 'N/A',
+                    y2022: company['employees_2022'] || 'N/A',
+                    y2023: company['employees_2023'] || 'N/A',
+                    unit: 'Count'
+                },
+                {
+                    metric: 'Scope 1+2 Emissions',
+                    y2021: company['scope_1+s2_lb_million_tco2e_2021'] || 'N/A',
+                    y2022: company['scope_1+2_lb_milion_tco2e_2022'] || 'N/A',
+                    y2023: company['scope_1+2_milion_tco2e_lb_2023'] || 'N/A',
+                    unit: 'Million tCO2e'
+                },
+                {
+                    metric: 'Scope 3 Emissions',
+                    y2021: company['scope_3_million_tco2e_2021'] || 'N/A',
+                    y2022: company['scope_3_million_tco2e_2022'] || 'N/A',
+                    y2023: company['scope_3_million_tco2e_2023'] || 'N/A',
+                    unit: 'Million tCO2e'
+                },
+                {
+                    metric: 'Renewable Electricity %',
+                    y2021: company['renewable_electricity_(%)_2021'] || 'N/A',
+                    y2022: company['renewable_electricity_(%)_2022'] || 'N/A',
+                    y2023: company['renewable_electricity_(%)_2023'] || 'N/A',
+                    unit: '%'
+                },
+                {
+                    metric: 'Women Employees %',
+                    y2021: 'N/A',
+                    y2022: 'N/A',
+                    y2023: company['women_employees_(%)_2023'] || 'N/A',
+                    unit: '%'
+                }
+            ];
+            
+            tbody.innerHTML = '';
+            metrics.forEach(metric => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${metric.metric}</strong></td>
+                    <td>${metric.y2021}</td>
+                    <td>${metric.y2022}</td>
+                    <td>${metric.y2023}</td>
+                    <td>${metric.unit}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function filterDetails() {
+            const searchTerm = document.getElementById('recordSearch').value.toLowerCase();
+            const rows = document.querySelectorAll('#metricsTableBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        }
+
+        function exportCompanyData() {
+            if (!currentCompany) {
+                alert('No company selected for export');
+                return;
+            }
+            
+            const csvContent = convertToCSV(currentCompany);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentCompany.company.replace(/[^a-z0-9]/gi, '_')}_sdg_data.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function convertToCSV(company) {
+            const headers = Object.keys(company);
+            const values = Object.values(company).map(v => `"${v || 'N/A'}"`);
+            
+            return headers.join(',') + '\n' + values.join(',');
+        }
+
+        // Sticky company bar logic
+        window.addEventListener('scroll', function() {
+            const details = document.getElementById('companyDetailsSection');
+            const stickyBar = document.getElementById('stickyCompanyBar');
+            if (!details || details.style.display === 'none') {
+                stickyBar.classList.remove('visible');
+                return;
+            }
+            const rect = details.getBoundingClientRect();
+            if (rect.top < 0) {
+                stickyBar.textContent = document.getElementById('companyName').textContent;
+                stickyBar.classList.add('visible');
+            } else {
+                stickyBar.classList.remove('visible');
+            }
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', loadData);
+    </script>
+</body>
+</html>
