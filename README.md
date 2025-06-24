@@ -29,3 +29,14 @@ This folder contains the SDG-based sustainability dashboard for analyzing 2000+ 
 - `sdg_dashboard.html` - Main dashboard interface
 - `start_sdg_server.bat` - Quick server startup script
 - `process_sdg_data.py` - Data processing utilities (optional)
+
+## Process SDG Data
+
+The `process_sdg_data.py` script converts the CSV data into a JSON file.
+Run it from the repository root:
+
+```bash
+python process_sdg_data.py [path/to/SDG-2000data.csv]
+```
+
+If no path is provided, the script uses the bundled `SDG-2000data.csv` file.
