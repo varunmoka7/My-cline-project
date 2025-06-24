@@ -1,11 +1,13 @@
-import pandas as pd
+import argparse
 import json
 import os
+import pandas as pd
 
-def process_sdg_csv():
+def process_sdg_csv(csv_path: str | None = None):
     try:
-        # Load the SDG CSV (corrected path)
-        csv_path = r'..\..\data\external\DATA_GoCarbonTracker\DATA GoCarbonTracker\Origin database\SDG-2000data.csv'
+        # Determine the CSV path. Use the CSV from this repository by default
+        if csv_path is None:
+            csv_path = os.path.join(os.path.dirname(__file__), 'SDG-2000data.csv')
         print(f"Loading CSV from: {csv_path}")
         
         df = pd.read_csv(csv_path)
@@ -80,4 +82,7 @@ def process_sdg_csv():
         traceback.print_exc()
 
 if __name__ == '__main__':
-    process_sdg_csv()
+    parser = argparse.ArgumentParser(description='Process SDG CSV into JSON')
+    parser.add_argument('csv_path', nargs='?', help='Optional path to SDG CSV file')
+    args = parser.parse_args()
+    process_sdg_csv(args.csv_path)
